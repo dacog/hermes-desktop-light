@@ -1,0 +1,160 @@
+name: Build Hermes Desktop Light and publish APT
+
+on:
+  schedule:
+    - cron: '17 5,17 * * *'
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: 'Optional upstream release tag (blank = latest stable)'
+        required: false
+        type: string
+      force:
+        description: 'Rebuild tag already released by this project'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hermes-desktop-light-release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      publish: ${{ steps.release.outputs.publish }}
+    steps:
+      - name: Resolve upstream stable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.upstream_tag }}
+          FORCE: ${{ inputs.force }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_TAG:-}" ]]; then
+            tag="$INPUT_TAG"
+          else
+            tag="$(gh api repos/NousResearch/hermes-agent/releases/latest --jq '.tag_name')"
+          fi
+          [[ "$tag" =~ ^v[0-9][0-9A-Za-z.+-]*$ ]] || exit 1
+          gh api "repos/NousResearch/hermes-agent/git/ref/tags/$tag" > /dev/null
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [[ "$FORCE" != 'true' ]] && gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    if: needs.check.outputs.publish == 'true'
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, suite: noble, ubuntu_version: '24.04', arch: amd64 }
+          - { runner: ubuntu-24.04-arm, suite: noble, ubuntu_version: '24.04', arch: arm64 }
+          - { runner: ubuntu-26.04, suite: resolute, ubuntu_version: '26.04', arch: amd64 }
+          - { runner: ubuntu-26.04-arm, suite: resolute, ubuntu_version: '26.04', arch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: NousResearch/hermes-agent
+          ref: ${{ needs.check.outputs.tag }}
+          path: hermes-agent
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git python3 dpkg-dev fakeroot libx11-dev libxi-dev
+      - name: Build upstream Light variant
+        working-directory: hermes-agent
+        env:
+          UPSTREAM_TAG: ${{ needs.check.outputs.tag }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          set -euo pipefail
+          python3 scripts/bundles/desktop.py --tag "$UPSTREAM_TAG" --variant light -- deb
+      - name: Normalize Debian metadata
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          UBUNTU_VERSION: ${{ matrix.ubuntu_version }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          debs=(hermes-agent/apps/desktop/release/*.deb)
+          (( ${#debs[@]} == 1 )) || { echo "Expected one .deb; got ${#debs[@]}" >&2; exit 1; }
+          [[ "$(dpkg-deb -f "${debs[0]}" Architecture)" == "$ARCH" ]]
+          version="$(dpkg-deb -f "${debs[0]}" Version)+ubuntu${UBUNTU_VERSION}"
+          mkdir -p unpacked dist
+          dpkg-deb --raw-extract "${debs[0]}" unpacked
+          sed -i -E -e 's/^Package: .*/Package: hermes-desktop-light/' -e "s/^Version: .*/Version: ${version}/" unpacked/DEBIAN/control
+          dpkg-deb --root-owner-group --build unpacked "dist/hermes-desktop-light_${version}_${ARCH}.deb"
+          [[ "$(dpkg-deb -f dist/*.deb Package)" == 'hermes-desktop-light' ]]
+      - name: Smoke test installation
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          dpkg-query -W hermes-desktop-light
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.suite }}-${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  publish:
+    needs: [check, build]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          merge-multiple: true
+          path: dist
+      - name: Install signing and APT tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils dpkg-dev gnupg
+      - name: Generate signed APT repository
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: bash scripts/publish-apt.sh
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy APT repository
+        id: deploy
+        uses: actions/deploy-pages@v4
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ needs.check.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$UPSTREAM_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$UPSTREAM_TAG" dist/*.deb dist/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$UPSTREAM_TAG" dist/*.deb dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+              --title "Hermes Desktop Light $UPSTREAM_TAG (unofficial)" \
+              --notes "Community-built Hermes Light packages for Ubuntu 24.04/26.04 (amd64/arm64). Not affiliated with Nous Research."
+          fi
