@@ -17,10 +17,22 @@ Upstream stable desktop downloads are generally **bundled** with the Hermes agen
 ## Status
 
 - [x] Experiment branch created
-- [ ] Windows x64: package produced
-- [ ] macOS arm64: package produced
+- [x] Windows x64: **MSIX produced successfully in CI** ([run #38180472615](https://github.com/dacog/hermes-desktop-light/actions/runs/38180472615))
+- [x] macOS arm64: **DMG and ZIP produced successfully in CI** ([run #38180472615](https://github.com/dacog/hermes-desktop-light/actions/runs/38180472615))
 - [ ] Install and connect to a remote gateway on actual Windows device
 - [ ] Install and connect to a remote gateway on actual macOS device
 - [ ] Review signing/notarization for user-friendly release distribution
 
 Built artifacts are ephemeral CI artifacts, not release downloads. Credentials (Windows code-signing certificate, Apple Developer ID / notarization) have intentionally not been configured.
+
+## First GitHub Actions test — success
+
+- Upstream pinned to `v0.21.6`, using its exact checkout commit and the official Light variant.
+- Windows x64 runner: `windows-2025`; build and `.msix` artifact validation passed.
+- macOS Apple Silicon runner: `macos-15`; build and `.dmg`/`.zip` artifact validation passed.
+- [Windows unsigned build artifact](https://github.com/dacog/hermes-desktop-light/actions/runs/38180472615#artifacts) (approx. 171 MB ZIP), and [macOS unsigned build artifact](https://github.com/dacog/hermes-desktop-light/actions/runs/38180472615#artifacts) (approx. 273 MB ZIP). CI artifacts expire after seven days.
+- Both jobs finished successfully. This validates compilation and file output, **not** installation, launch, notarization, or remote-gateway operation.
+
+### Important installation caveats
+
+Windows MSIX packages normally require trusted code signing before installation; an unsigned MSIX should **not** be presented to ordinary users as a ready-to-install app. macOS unsigned/unnotarized DMGs may be blocked by Gatekeeper. Neither was tested on a physical host. The next phase should prepare an installable test strategy (trusted test cert for Windows, developer signing/notarization for macOS, or a separate portable Windows output) before announcing downloads as supported.
