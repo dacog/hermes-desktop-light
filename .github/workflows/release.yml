@@ -93,7 +93,33 @@ jobs:
           set -euo pipefail
           # Upstream stable --tag builds require protected internal release-claim metadata.
           # Our third-party build uses the immutable upstream commit instead.
-          python3 scripts/bundles/desktop.py --commit "${{ steps.revision.outputs.sha }}" --variant light -- deb
+          # Upstream currently prepares only AppImage on Linux; we need both.
+          # First generate its validated native tools, then regenerate the packaging
+          # input manifest using the upstream packager's own --format flags.
+          python3 scripts/bundles/desktop.py --commit "${{ steps.revision.outputs.sha }}" --variant light --prepare-only
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          from scripts.bundles.desktop_prepare import PreparedDesktop, fingerprint
+
+          prepared_path = Path(".build/desktop-job/prepared.json").resolve()
+          prepared = PreparedDesktop.load(prepared_path)
+          packager = prepared.packager
+          node = prepared.node
+          cmd = [
+              str(node), "apps/desktop/scripts/prepare-packaging-tools.mjs",
+              "--source", str(Path.cwd()), "--out", str(packager.parent),
+              "--cache", str(prepared.request.cache / "packager"),
+              "--target", prepared.request.target,
+              "--format", "AppImage", "--format", "deb"
+          ]
+          subprocess.run(cmd, check=True)
+          # The enclosing preparation receipt also records the packager's digest.
+          prepared.digests[str(packager)] = fingerprint(packager)
+          prepared.write(prepared_path)
+          PY
+          python3 scripts/bundles/desktop.py --prepared .build/desktop-job/prepared.json -- deb
       - name: Normalize Debian metadata
         shell: bash
         env:
