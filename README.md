@@ -48,15 +48,15 @@ Then use `sudo apt upgrade` for subsequent updates.
 ## Workflow
 
 - **Check:** resolve latest stable upstream tag, or manual `upstream_tag`.
-- **Build:** check out exact upstream tag; use `python3 scripts/bundles/desktop.py --tag "$UPSTREAM_TAG" --variant light -- deb` on each native runner.
-- **Package:** normalize the Debian package name and add a distribution-specific version suffix.
+- **Build:** check out the upstream release tag, verify its exact commit, prepare upstream Light dependencies plus `deb` packaging tools, and compile with the fixed stable Hermes Light identity using the GitHub Actions build environment. The upstream internal release-claim mechanism is not required for this community build.
+- **Package:** normalize the Debian package name to `hermes-desktop-light` and derive a Debian version from the upstream release tag (`0.21.6+ubuntu24.04`, for example), rather than the `0.0.0` source version used for commit builds.
 - **Test:** install with `apt-get` on each matching runner.
 - **Publish:** generate signed `noble` and `resolute` APT metadata, deploy via GitHub Pages, and retain packages in GitHub Releases.
 
-The first CI run may reveal upstream build requirements that need adjustments. This is a community project, not an official upstream installer.
+The Linux packaging flow is maintained independently from the disabled upstream Linux release jobs; future upstream changes may require compatibility fixes. This is a community project, not an official upstream installer.
 
 ## Security and limitations
 
-The workflow does not include end-to-end GUI-to-gateway testing, vulnerability scanning, or cryptographic verification of upstream source beyond checkout of its published tag. APT signatures authenticate the repository metadata under **your** signing key. Do not commit the contents of `signing/`.
+The workflow does not include end-to-end GUI-to-gateway testing or vulnerability scanning. The upstream source is checked out by its release tag and verified by the exact commit SHA, but upstream tag cryptographic signatures are not verified. APT signatures authenticate the repository metadata under **your** signing key. Do not commit the contents of `signing/`.
 
 See [upstream Desktop build instructions](https://github.com/NousResearch/hermes-agent/blob/main/apps/desktop/BUILDING.md).
