@@ -120,6 +120,45 @@ jobs:
               "--format", "AppImage", "--format", "deb"
           ]
           subprocess.run(cmd, check=True)
+
+          # Electron Builder's icon-tool.js is CommonJS. Its toolset gets copied
+          # beneath apps/desktop/ where package.json declares type=module.
+          # Place a local CommonJS package scope in the prepared icons toolset
+          # so require() works after the builder copies it. Do not modify the
+          # upstream source checkout or the locked third-party JS dependencies.
+          icons_dir = packager.parent / "icons"
+          icon_tool = icons_dir / "icon-tool.js"
+          if not icon_tool.is_file():
+              raise FileNotFoundError(f"Expected prepared icon tool: {icon_tool}")
+          (icons_dir / "package.json").write_text(
+              '{"private":true,"type":"commonjs"}\\n'.replace('\\n', '\n'),
+              encoding="utf-8",
+          )
+
+          # Both nested and enclosing upstream preparation receipts are
+          # SHA-256 attested. Refresh ONLY the icon toolset digest, using
+          # upstream's real treeDigest algorithm, before the build admission.
+          manifest = json.loads(packager.read_text(encoding="utf-8"))
+          if Path(manifest["toolsets"]["icons"]).resolve() != icons_dir.resolve():
+              raise ValueError("Prepared icons directory does not match manifest")
+          digest = subprocess.check_output(
+              [
+                  str(node), "--input-type=module", "-e",
+                  "import {treeDigest} from './apps/desktop/scripts/prepared-packaging.mjs'; "
+                  "console.log(treeDigest(process.argv[1]))",
+                  str(icons_dir),
+              ],
+              cwd=Path.cwd(), text=True,
+          ).strip()
+          updates = 0
+          for entry in manifest["files"]:
+              if Path(entry["path"]).resolve() == icons_dir.resolve():
+                  entry["digest"] = digest
+                  updates += 1
+          if updates != 1:
+              raise ValueError(f"Expected exactly one icon digest entry; got {updates}")
+          packager.write_text(json.dumps(manifest, indent=2) + "\\n".replace('\\n', '\n'), encoding="utf-8")
+
           # The enclosing preparation receipt also records the packager's digest.
           prepared.digests[str(packager)] = fingerprint(packager)
           prepared.write(prepared_path)
