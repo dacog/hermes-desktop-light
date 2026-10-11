@@ -9,6 +9,7 @@ files=(dist/*.deb)
 (( ${#files[@]} == 4 )) || { echo "Expected exactly 4 packages; got ${#files[@]}" >&2; exit 1; }
 mkdir -p site/pool/noble/main site/pool/resolute/main
 : > site/.nojekyll
+release_version=""
 for deb in "${files[@]}"; do
   package="$(dpkg-deb -f "$deb" Package)"
   arch="$(dpkg-deb -f "$deb" Architecture)"
@@ -21,6 +22,12 @@ for deb in "${files[@]}"; do
     *+ubuntu26.04) suite=resolute ;;
     *) echo "Unknown Ubuntu target: $version" >&2; exit 1 ;;
   esac
+  upstream_version="${version%%+ubuntu*}"
+  [[ "$upstream_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release version: $version" >&2; exit 1; }
+  if [[ -n "$release_version" && "$release_version" != "$upstream_version" ]]; then
+    echo "Mixed package versions in APT pool" >&2; exit 1
+  fi
+  release_version="$upstream_version"
   cp "$deb" "site/pool/$suite/main/"
 done
 export GNUPGHOME="$(mktemp -d)"
@@ -60,4 +67,7 @@ rm -f site/release.conf
 images=(dist/*.AppImage)
 (( ${#images[@]} == 2 )) || { echo "Expected two portable AppImages (amd64 and arm64), got ${#images[@]}" >&2; exit 1; }
 ( cd dist && sha256sum -- *.deb *.AppImage > SHA256SUMS )
+[[ -f docs/index.html ]] || { echo "Missing Pages homepage template" >&2; exit 1; }
+sed "s/@VERSION@/$release_version/g" docs/index.html > site/index.html
+[[ -s site/index.html ]] && ! grep -q '@VERSION@' site/index.html || { echo "Failed to render homepage" >&2; exit 1; }
 printf 'Signed Ubuntu noble/resolute amd64/arm64 repositories and verified AppImage assets ready\n'

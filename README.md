@@ -11,6 +11,8 @@ Community packaging for the **remote-only** Hermes Desktop Light client, built f
 | 24.04 LTS | noble | amd64, arm64 |
 | 26.04 LTS | resolute | amd64, arm64 |
 
+The [project homepage](https://dacog.github.io/hermes-desktop-light/) is generated alongside the signed APT repository, with versioned download links.
+
 The scheduled workflow checks the latest **stable** upstream release twice daily and builds four Debian packages, plus two portable AppImages (amd64 and arm64, compiled on Ubuntu 24.04 for a broad Linux compatibility baseline). Debian packages are checked with `apt-get install` in CI before publication. The remote Hermes gateway runs on a separate device.
 
 ## One-time setup

@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/release.yml'
       - 'scripts/**'
+      - 'docs/**'
   schedule:
     - cron: '17 5,17 * * *'
   workflow_dispatch:

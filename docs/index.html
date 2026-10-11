@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131b27">
+<meta name="description" content="Unofficial community Linux packages for Hermes Desktop Light: signed APT repository, Ubuntu/Kubuntu .deb and portable AppImages.">
+<title>Hermes Desktop Light — Linux packages</title>
+<style>
+:root{color-scheme:dark;--bg:#111925;--panel:#1b2937;--border:#344657;--fg:#edf5f8;--muted:#b2c2cf;--mint:#a9e8d7}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+.wrap{max-width:1000px;margin:auto;padding:0 24px}a{color:#b6eafa;text-underline-offset:3px}
+nav{display:flex;gap:24px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:27px 0;border-bottom:1px solid var(--border)}
+nav a{text-decoration:none;color:var(--muted)}nav .brand{font-size:1.1rem;font-weight:800;color:var(--fg)}
+.hero{padding:65px 0 32px}.eyebrow{color:var(--mint);font-size:.82rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+h1{max-width:760px;font-size:clamp(2.3rem,6vw,4.3rem);line-height:1.08;letter-spacing:-.05em;margin:16px 0 22px}
+h2{font-size:1.65rem;line-height:1.2;letter-spacing:-.025em;margin:0 0 16px}h3{margin:0 0 8px}
+p{margin:0 0 16px}.lead{font-size:1.13rem;max-width:710px;color:var(--muted)}
+.small{color:var(--muted);font-size:.92rem}.buttons{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}
+.button{display:inline-block;border:1px solid var(--border);border-radius:9px;padding:9px 15px;background:#263645;color:var(--fg);font-weight:650;text-decoration:none}
+.button.primary{background:var(--mint);color:#11251d;border-color:var(--mint)}
+section{margin:34px 0 45px}.panel{padding:25px;border:1px solid var(--border);border-radius:13px;background:var(--panel)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+pre{overflow:auto;border:1px solid var(--border);border-radius:9px;background:#0d141c;padding:18px;font-size:.84rem;line-height:1.65}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+footer{border-top:1px solid var(--border);padding:26px 0 50px;color:var(--muted);font-size:.9rem}
+@media(max-width:680px){.grid{grid-template-columns:1fr}.hero{padding-top:40px}.panel{padding:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><nav aria-label="Main navigation"><a class="brand" href="./">Hermes Desktop Light</a>
+<div><a href="#install">Installation</a> · <a href="#downloads">Downloads</a> · <a href="https://github.com/dacog/hermes-desktop-light">GitHub</a></div>
+</nav></header>
+<main>
+<div class="hero"><div class="eyebrow">Community Linux builds · Unofficial</div>
+<h1>Hermes Light for your Linux desktop.</h1>
+<p class="lead">A remote-only graphical client for Hermes. Native Ubuntu / Kubuntu packages with automatic APT updates, and portable Linux AppImages. Connect to an existing remote Hermes gateway.</p>
+<div class="buttons"><a class="button primary" href="#install">Install with APT →</a>
+<a class="button" href="https://github.com/dacog/hermes-desktop-light/releases/tag/v@VERSION@">Download v@VERSION@</a></div>
+<p class="small">Release v@VERSION@ · Ubuntu 24.04 / 26.04 · AMD64 / ARM64</p></div>
+<section class="panel" id="install">
+<h2>Install with APT</h2>
+<p class="small">For Ubuntu / Kubuntu 24.04 (noble) or 26.04 (resolute). The commands install the repository GPG key and enable standard system updates.</p>
+<pre><code>set -e
+base="https://dacog.github.io/hermes-desktop-light"
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL "$base/hermes-desktop-light.gpg" |
+  sudo tee /etc/apt/keyrings/hermes-desktop-light.gpg &gt;/dev/null
+sudo chmod 644 /etc/apt/keyrings/hermes-desktop-light.gpg
+codename="$(. /etc/os-release; printf '%s' "$VERSION_CODENAME")"
+case "$codename" in
+  noble|resolute) ;;
+  *) echo "Unsupported Ubuntu base: $codename"; exit 1 ;;
+esac
+arch="$(dpkg --print-architecture)"
+echo "deb [arch=$arch signed-by=/etc/apt/keyrings/hermes-desktop-light.gpg] $base $codename main" |
+  sudo tee /etc/apt/sources.list.d/hermes-desktop-light.list
+sudo apt update
+sudo apt install hermes-desktop-light</code></pre>
+<p class="small">Launch <strong>Hermes Light</strong> from your desktop's application menu. Debian package installation has passed CI smoke tests; GUI operation and connection to your gateway still need testing on a real device.</p>
+</section>
+<section id="downloads"><h2>Direct downloads</h2>
+<div class="grid">
+<article class="panel"><h3>Portable AppImage</h3><p class="small">Runs without installation on compatible Linux systems. Download, run chmod +x, and execute. No APT auto-updates.</p>
+<div class="buttons">
+<a class="button" href="https://github.com/dacog/hermes-desktop-light/releases/download/v@VERSION@/hermes-desktop-light_@VERSION@_linux_amd64.AppImage">AMD64 AppImage ↓</a>
+<a class="button" href="https://github.com/dacog/hermes-desktop-light/releases/download/v@VERSION@/hermes-desktop-light_@VERSION@_linux_arm64.AppImage">ARM64 AppImage ↓</a>
+</div></article>
+<article class="panel"><h3>Native Debian packages</h3><p class="small">Prefer APT for automatic updates or download the .deb for your Ubuntu release and CPU architecture.</p>
+<div class="buttons">
+<a class="button" href="https://github.com/dacog/hermes-desktop-light/releases/download/v@VERSION@/hermes-desktop-light_@VERSION@%2Bubuntu24.04_amd64.deb">24.04 AMD64 ↓</a>
+<a class="button" href="https://github.com/dacog/hermes-desktop-light/releases/download/v@VERSION@/hermes-desktop-light_@VERSION@%2Bubuntu24.04_arm64.deb">24.04 ARM64 ↓</a>
+<a class="button" href="https://github.com/dacog/hermes-desktop-light/releases/download/v@VERSION@/hermes-desktop-light_@VERSION@%2Bubuntu26.04_amd64.deb">26.04 AMD64 ↓</a>
+<a class="button" href="https://github.com/dacog/hermes-desktop-light/releases/download/v@VERSION@/hermes-desktop-light_@VERSION@%2Bubuntu26.04_arm64.deb">26.04 ARM64 ↓</a>
+</div></article></div></section>
+<section class="panel"><h2>Open source community packaging</h2>
+<p>This project packages the Light variant of <a href="https://github.com/NousResearch/hermes-agent">Hermes Agent</a>. It is unofficial and not affiliated with Nous Research. Build workflows and checksums are available on <a href="https://github.com/dacog/hermes-desktop-light/releases">GitHub Releases</a>.</p>
+<p class="small">Signed repository metadata: <a href="dists/noble/InRelease">noble</a> · <a href="dists/resolute/InRelease">resolute</a>.</p></section>
+</main>
+<footer>Hermes Desktop Light · <a href="https://github.com/dacog/hermes-desktop-light">Packaging source</a> · <a href="https://github.com/NousResearch/hermes-agent">Upstream Hermes</a></footer>
+</div>
+</body>
+</html>
