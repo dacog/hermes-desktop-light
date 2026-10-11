@@ -86,6 +86,22 @@ sudo apt install hermes-desktop-light
 
 Once installed, look for **Hermes Light** in the application menu. Updates are handled by your usual `sudo apt upgrade`. Alternatively, download the matching `.deb` from [Releases](https://github.com/dacog/hermes-desktop-light/releases/latest).
 
+## Automatic upstream release tracking and updates
+
+**This repository automatically tracks new stable Hermes Agent releases.** GitHub Actions checks the official [NousResearch/hermes-agent releases](https://github.com/NousResearch/hermes-agent/releases) **twice a day**, at **05:17 and 17:17 UTC**, and compares the latest stable upstream tag against the releases already published by this project.
+
+When a new stable tag appears, the workflow automatically:
+
+1. Checks out that exact upstream version and builds the unmodified **Hermes Light** desktop client for the supported Linux targets.
+2. Runs Debian installation smoke tests, then publishes four `.deb` packages and two AppImages, plus SHA-256 checksums, to this project's GitHub Releases.
+3. Regenerates the signed APT repository and GitHub Pages downloads page.
+
+**No manual rebuild or release upload is normally needed.** If a version is already published, the workflow skips it; scheduled GitHub Actions runs may occasionally be delayed, and a failed build or deployment requires attention.
+
+**How updates reach your devices:** on Ubuntu/Kubuntu, installing from the signed APT repository means newly published versions are available through your usual `sudo apt update && sudo apt upgrade` (or your graphical system updater). **AppImages do not automatically update on your devices**; download a newer AppImage from Releases when one is available. The repository automation publishes updated binaries, but it does **not** automatically modify the tracked Hermes source files or install anything on your devices.
+
+Website-only changes are handled by a [separate GitHub Pages workflow](.github/workflows/pages.yml), which reuses already published packages instead of recompiling Hermes.
+
 ## How the builds work
 
 The [GitHub Actions workflow](.github/workflows/release.yml):
