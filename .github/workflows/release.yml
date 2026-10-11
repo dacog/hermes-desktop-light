@@ -73,6 +73,13 @@ jobs:
           path: hermes-agent
           fetch-depth: 1
           persist-credentials: false
+      - name: Resolve exact upstream commit
+        id: revision
+        working-directory: hermes-agent
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -84,7 +91,9 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           set -euo pipefail
-          python3 scripts/bundles/desktop.py --tag "$UPSTREAM_TAG" --variant light -- deb
+          # Upstream stable --tag builds require protected internal release-claim metadata.
+          # Our third-party build uses the immutable upstream commit instead.
+          python3 scripts/bundles/desktop.py --commit "${{ steps.revision.outputs.sha }}" --variant light -- deb
       - name: Normalize Debian metadata
         shell: bash
         env:
