@@ -1,0 +1,90 @@
+name: Experiment - Hermes Light Windows and macOS
+
+on:
+  push:
+    branches:
+      - experiment/windows-macos-light
+    paths:
+      - '.github/workflows/desktop-windows-macos-experiment.yml'
+      - 'docs/windows-macos-experiment.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hermes-light-cross-platform-experiment
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows x64 - unsigned MSIX
+            runner: windows-2025
+            platform: windows
+          - label: macOS Apple Silicon - unsigned DMG and ZIP
+            runner: macos-15
+            platform: macos
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout upstream Hermes release
+        uses: actions/checkout@v5
+        with:
+          repository: NousResearch/hermes-agent
+          ref: v0.21.6
+          path: hermes-agent
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install host Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Inspect platform and pinned source
+        working-directory: hermes-agent
+        run: |
+          set -euo pipefail
+          python --version
+          git rev-parse HEAD
+          git status --short
+      - name: Build the upstream remote-only Light client
+        working-directory: hermes-agent
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CI: 'true'
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          # Uses the documented upstream commit-build interface, no source
+          # patches, release claims, developer signing keys or local agent.
+          python scripts/bundles/desktop.py --commit "$sha" --variant light
+      - name: Check unsigned packaging output
+        working-directory: hermes-agent
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          find apps/desktop/release -maxdepth 1 -type f -print
+          if [[ "$PLATFORM" == windows ]]; then
+            compgen -G "apps/desktop/release/*.msix" > /dev/null
+          else
+            compgen -G "apps/desktop/release/*.dmg" > /dev/null
+            compgen -G "apps/desktop/release/*.zip" > /dev/null
+          fi
+      - name: Upload experimental unsigned assets
+        uses: actions/upload-artifact@v6
+        with:
+          name: hermes-light-${{ matrix.platform }}-unsigned
+          path: |
+            hermes-agent/apps/desktop/release/*.msix
+            hermes-agent/apps/desktop/release/*.dmg
+            hermes-agent/apps/desktop/release/*.zip
+          if-no-files-found: error
+          retention-days: 7
