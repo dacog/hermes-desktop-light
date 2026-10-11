@@ -57,5 +57,7 @@ CONF
   gpg --batch --yes --local-user "$fingerprint" --armor --detach-sign -o "site/dists/$suite/Release.gpg" "site/dists/$suite/Release"
 done
 rm -f site/release.conf
-( cd dist && sha256sum -- *.deb > SHA256SUMS )
-printf 'Signed Ubuntu noble/resolute amd64/arm64 repositories ready in site/\n'
+images=(dist/*.AppImage)
+(( ${#images[@]} == 2 )) || { echo "Expected two portable AppImages (amd64 and arm64), got ${#images[@]}" >&2; exit 1; }
+( cd dist && sha256sum -- *.deb *.AppImage > SHA256SUMS )
+printf 'Signed Ubuntu noble/resolute amd64/arm64 repositories and verified AppImage assets ready\n'

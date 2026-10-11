@@ -94,6 +94,7 @@ jobs:
         env:
           UPSTREAM_TAG: ${{ needs.check.outputs.tag }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          SUITE: ${{ matrix.suite }}
         run: |
           set -euo pipefail
           # Upstream stable --tag builds require protected internal release-claim metadata.
@@ -202,10 +203,11 @@ jobs:
               env=env, cwd=Path.cwd(), check=True,
           )
 
-          # desktop.py includes AppImage in its Linux defaults. The second
-          # --linux supplies the Debian target as an option, not a bare arg.
+          # Use the oldest supported Ubuntu baseline for the portable
+          # AppImages. Ubuntu 26.04 jobs need only the native Debian target.
+          targets = ["AppImage", "deb"] if os.environ["SUITE"] == "noble" else ["deb"]
           desktop.build_prepared(prep, [
-              "--linux", "deb", f"-c.extraMetadata.version={version}"
+              "--linux", *targets, f"-c.extraMetadata.version={version}"
           ])
           PY
       - name: Normalize Debian metadata
@@ -231,6 +233,25 @@ jobs:
         run: |
           sudo apt-get install -y ./dist/*.deb
           dpkg-query -W hermes-desktop-light
+      - name: Stage portable AppImage
+        if: matrix.suite == 'noble'
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          UPSTREAM_TAG: ${{ needs.check.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(hermes-agent/apps/desktop/release/*.AppImage)
+          (( ${#images[@]} == 1 )) || { echo "Expected one AppImage on Ubuntu 24.04, got ${#images[@]}" >&2; exit 1; }
+          install -m 0755 "${images[0]}" "dist/hermes-desktop-light_${UPSTREAM_TAG#v}_linux_${ARCH}.AppImage"
+          test -s "dist/hermes-desktop-light_${UPSTREAM_TAG#v}_linux_${ARCH}.AppImage"
+      - uses: actions/upload-artifact@v6
+        if: matrix.suite == 'noble'
+        with:
+          name: appimage-${{ matrix.arch }}
+          path: dist/*.AppImage
+          if-no-files-found: error
       - uses: actions/upload-artifact@v6
         with:
           name: deb-${{ matrix.suite }}-${{ matrix.arch }}
@@ -255,6 +276,11 @@ jobs:
           pattern: deb-*
           merge-multiple: true
           path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: appimage-*
+          merge-multiple: true
+          path: dist
       - name: Install signing and APT tools
         run: |
           sudo apt-get update
@@ -263,23 +289,42 @@ jobs:
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
         run: bash scripts/publish-apt.sh
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - name: Deploy APT repository
-        id: deploy
-        uses: actions/deploy-pages@v4
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           UPSTREAM_TAG: ${{ needs.check.outputs.tag }}
         run: |
           set -euo pipefail
+          files=(dist/*.deb dist/*.AppImage dist/SHA256SUMS)
           if gh release view "$UPSTREAM_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$UPSTREAM_TAG" dist/*.deb dist/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$UPSTREAM_TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$UPSTREAM_TAG" dist/*.deb dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" \
+            gh release create "$UPSTREAM_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
               --title "Hermes Desktop Light $UPSTREAM_TAG (unofficial)" \
-              --notes "Community-built Hermes Light packages for Ubuntu 24.04/26.04 (amd64/arm64). Not affiliated with Nous Research."
+              --notes "Community-built Hermes Light for Ubuntu 24.04/26.04 (deb, amd64/arm64) plus portable AppImages built on Ubuntu 24.04 (amd64/arm64). Unofficial, not affiliated with Nous Research."
           fi
+          echo "### Download" >> "$GITHUB_STEP_SUMMARY"
+          echo "Packages: https://github.com/$GITHUB_REPOSITORY/releases/tag/$UPSTREAM_TAG" >> "$GITHUB_STEP_SUMMARY"
+      - name: Check Pages enabled
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/pages" >/dev/null 2>&1; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub Pages is not enabled. Enable Settings > Pages > Source: GitHub Actions, then manually run this workflow with force=true to deploy APT."
+            echo "### APT not yet deployed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Enable GitHub Pages (Source: GitHub Actions), then run this workflow with **force=true** to publish the signed APT repository." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/configure-pages@v6
+        if: steps.pages.outputs.enabled == 'true'
+      - uses: actions/upload-pages-artifact@v5
+        if: steps.pages.outputs.enabled == 'true'
+        with:
+          path: site
+      - name: Deploy APT repository
+        if: steps.pages.outputs.enabled == 'true'
+        id: deploy
+        uses: actions/deploy-pages@v5

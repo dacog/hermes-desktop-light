@@ -2,7 +2,7 @@
 
 Community packaging for the **remote-only** Hermes Desktop Light client, built from [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). Not affiliated with Nous Research.
 
-> **Status:** CI configuration is published, but builds and live gateway connectivity have not yet been verified. Do not install until the first successful release and signed Pages deployment.
+> **Status:** All four Debian builds passed installation smoke tests in GitHub Actions. GUI launch and remote gateway connectivity have **not** been tested on a real desktop. GitHub Pages must be enabled separately before APT is available.
 
 ## Supported targets
 
@@ -11,7 +11,7 @@ Community packaging for the **remote-only** Hermes Desktop Light client, built f
 | 24.04 LTS | noble | amd64, arm64 |
 | 26.04 LTS | resolute | amd64, arm64 |
 
-The scheduled workflow checks the latest **stable** upstream release twice daily and builds four packages. Builds are verified with `apt-get install` before publication. The remote Hermes gateway runs on a separate device.
+The scheduled workflow checks the latest **stable** upstream release twice daily and builds four Debian packages, plus two portable AppImages (amd64 and arm64, compiled on Ubuntu 24.04 for a broad Linux compatibility baseline). Debian packages are checked with `apt-get install` in CI before publication. The remote Hermes gateway runs on a separate device.
 
 ## One-time setup
 
@@ -21,11 +21,22 @@ The scheduled workflow checks the latest **stable** upstream release twice daily
    ```bash
    gh secret set APT_GPG_PRIVATE_KEY < signing/apt-private-key.asc
    ```
-4. In **Actions**, manually run **Build Hermes Desktop Light and publish APT**. Confirm all four builds, package smoke tests, GitHub Release assets, and GitHub Pages deployment succeed.
+4. In **Actions**, run **Build Hermes Desktop Light and publish APT**. Confirm all four Debian builds, the two AppImages, the GitHub Release and Pages deployment. If a GitHub Release already exists but APT is not yet published, run with **force=true** after enabling Pages. Otherwise the workflow skips that already-published version.
 
-The signing key is **not** in GitHub; the pipeline cannot publish until the secret is configured.
+The signing key is **not** in GitHub; the pipeline cannot sign APT metadata until the secret is configured. GitHub Actions cannot automatically enable Pages with its default GITHUB_TOKEN. If you see a Pages warning, open [Settings → Pages](https://github.com/dacog/hermes-desktop-light/settings/pages) and select **Source: GitHub Actions**. Release assets are uploaded independently of Pages.
 
-## Installation
+## Portable AppImages (no installation)
+
+Download the amd64 or arm64 `.AppImage` from [GitHub Releases](https://github.com/dacog/hermes-desktop-light/releases). On a compatible Linux system:
+
+```bash
+chmod +x hermes-desktop-light_*.AppImage
+./hermes-desktop-light_*.AppImage
+```
+
+AppImages do not use the APT auto-update channel. The older Ubuntu 24.04 build baseline generally improves portability, but compatibility still depends on your Linux environment (including FUSE support). Always test launching and connecting to your remote Hermes gateway.
+
+## Installation through APT
 
 After the first successful Pages deployment:
 
@@ -50,8 +61,8 @@ Then use `sudo apt upgrade` for subsequent updates.
 - **Check:** resolve latest stable upstream tag, or manual `upstream_tag`.
 - **Build:** check out the upstream release tag, verify its exact commit, prepare upstream Light dependencies plus `deb` packaging tools, and compile with the fixed stable Hermes Light identity using the GitHub Actions build environment. The upstream internal release-claim mechanism is not required for this community build.
 - **Package:** normalize the Debian package name to `hermes-desktop-light` and derive a Debian version from the upstream release tag (`0.21.6+ubuntu24.04`, for example), rather than the `0.0.0` source version used for commit builds.
-- **Test:** install with `apt-get` on each matching runner.
-- **Publish:** generate signed `noble` and `resolute` APT metadata, deploy via GitHub Pages, and retain packages in GitHub Releases.
+- **Test:** install each Debian package with `apt-get` on its matching runner; assert both portable AppImages are produced.
+- **Publish:** generate signed `noble` and `resolute` APT metadata, publish all four Debian packages plus two AppImages through GitHub Releases, and deploy APT to Pages if GitHub Pages is enabled. If Pages is not enabled, the Release remains available and the job reports an explicit warning.
 
 The Linux packaging flow is maintained independently from the disabled upstream Linux release jobs; future upstream changes may require compatibility fixes. This is a community project, not an official upstream installer.
 
