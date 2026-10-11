@@ -37,12 +37,12 @@ The resulting packages are based on a specific upstream Git tag and exact checko
 
 | Format | Platform | Architecture | Verification |
 | --- | --- | --- | --- |
-| AppImage | **Kubuntu 26.04** | AMD64 | **Successfully launched on a real machine** (October 2026, user-tested) |
+| AppImage | **Kubuntu 26.04** | AMD64 | **Launched successfully and connected to a remote Hermes backend** (October 2026, user-tested) |
 | AppImage | Other compatible Linux distributions | AMD64, ARM64 | Builds in CI; graphical operation not yet confirmed |
 | `.deb` | Ubuntu/Kubuntu 24.04 (noble) | AMD64, ARM64 | Builds and installs successfully in GitHub Actions |
 | `.deb` | Ubuntu/Kubuntu 26.04 (resolute) | AMD64, ARM64 | Builds and installs successfully in GitHub Actions; **manual desktop test pending** |
 
-**Important:** a successful AppImage launch is confirmed on Kubuntu 26.04, but an end-to-end connection to the remote Hermes server has **not yet been verified here**. Likewise, the `.deb` packages have passed installation smoke tests but are still awaiting an independent real-desktop test.
+**Verified on a real device:** on Kubuntu 26.04 AMD64, the AppImage **opens and successfully connects to an existing remote Hermes backend**. The `.deb` packages have passed installation smoke tests in CI, but are **still awaiting manual GUI testing**.
 
 The AppImages are compiled on Ubuntu 24.04 to provide a relatively conservative Linux baseline; this does not guarantee compatibility with every distribution or desktop environment.
 
@@ -57,7 +57,7 @@ chmod +x hermes-desktop-light_*.AppImage
 ./hermes-desktop-light_*.AppImage
 ```
 
-The AppImage has been opened successfully on **Kubuntu 26.04**. Depending on the distribution, AppImage execution can require FUSE-related compatibility packages. AppImages do **not** receive APT updates or necessarily create an application menu shortcut automatically.
+The AppImage has been opened and **connected successfully to a remote Hermes backend on Kubuntu 26.04 (AMD64)**. Depending on the distribution, AppImage execution can require FUSE-related compatibility packages. AppImages do **not** receive APT updates or necessarily create an application menu shortcut automatically.
 
 ### Option 2: Native `.deb` via APT (Ubuntu/Kubuntu)
 
@@ -90,12 +90,14 @@ Once installed, look for **Hermes Light** in the application menu. Updates are h
 
 The [GitHub Actions workflow](.github/workflows/release.yml):
 
-1. Checks for the latest stable NousResearch Hermes release **twice daily**, or accepts a manually specified upstream tag.
+1. Checks for the latest stable NousResearch Hermes release **twice daily at 05:17 and 17:17 UTC** (scheduled GitHub Actions runs may be delayed), or accepts a manually specified upstream tag. When no new stable release is available, the build and publication jobs are skipped.
 2. Checks out that exact upstream release and compiles the official **Light** desktop variant—no locally installed Hermes Agent is required.
 3. Builds **four `.deb` packages**: Ubuntu 24.04 and 26.04, each for AMD64 and ARM64.
 4. Builds **two portable AppImages** (AMD64 and ARM64), using Ubuntu 24.04 runners.
 5. Tests the installation of each `.deb` with APT inside its matching GitHub Actions runner.
 6. Publishes all six binaries and SHA-256 checksums to [GitHub Releases](https://github.com/dacog/hermes-desktop-light/releases), and deploys the signed APT repository and download homepage through GitHub Pages.
+
+The separate [Pages deployment workflow](.github/workflows/pages.yml) updates the homepage and signed APT metadata **without rebuilding Hermes**. It downloads the last published release, verifies its checksums, re-generates the repository metadata and site, and deploys it. This also runs automatically when the homepage template or APT publishing script changes.
 
 Linux release builds are not currently part of the upstream project's regular release matrix. This repository fills that gap independently. The temporary packaging adaptations, stable application identity, and Debian package name are maintained **here**, without submitting modified Hermes app source as our own.
 
@@ -110,7 +112,7 @@ gh secret set APT_GPG_PRIVATE_KEY < signing/apt-private-key.asc
 
 The private key belongs in a secure, separate backup—not in Git. The entire `signing/` directory is ignored by `.gitignore`. The secret is used only by GitHub Actions to sign APT metadata.
 
-Releases already published are skipped by default. To rebuild a particular upstream version or publish the APT site again, use **Actions → Run workflow** with the appropriate version and `force=true`.
+Releases already published are skipped by default. To **rebuild binaries**, use **Actions → Build Hermes Desktop Light and publish APT → Run workflow** with `force=true`. To **refresh only GitHub Pages / APT metadata**, use **Actions → Deploy Hermes Desktop Light Pages → Run workflow** instead; it reuses the already published release assets and does not recompile the application.
 
 ## Scope and possible future distributions
 

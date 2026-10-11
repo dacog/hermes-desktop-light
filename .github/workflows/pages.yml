@@ -1,0 +1,69 @@
+name: Deploy Hermes Desktop Light Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages.yml'
+      - 'docs/**'
+      - 'scripts/publish-apt.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hermes-desktop-light-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download and verify published release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "No supported stable release is published: $tag" >&2
+            exit 1
+          }
+          mkdir -p dist
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir dist
+          ( cd dist && sha256sum --check SHA256SUMS )
+          echo "Deploying previously published release $tag"
+      - name: Install APT and GPG tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils dpkg-dev gnupg
+      - name: Build signed APT metadata and homepage
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          bash scripts/publish-apt.sh
+          test -s site/index.html
+          test -s site/dists/noble/InRelease
+          test -s site/dists/resolute/InRelease
+          test -s site/hermes-desktop-light.gpg
+          echo "### Pages and signed APT repository regenerated" >> "$GITHUB_STEP_SUMMARY"
+          echo "Page: https://dacog.github.io/hermes-desktop-light/" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
