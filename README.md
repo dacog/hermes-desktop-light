@@ -1,46 +1,67 @@
-# Hermes Desktop Light — unofficial Ubuntu/Kubuntu APT packages
+# Hermes Desktop Light for Linux
 
-Community packaging for the **remote-only** Hermes Desktop Light client, built from [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). Not affiliated with Nous Research.
+**Run the Hermes desktop client on your laptop without installing the complete Hermes Agent locally.**
 
-> **Status:** All four Debian builds passed installation smoke tests in GitHub Actions. GUI launch and remote gateway connectivity have **not** been tested on a real desktop. GitHub Pages must be enabled separately before APT is available.
+Unofficial, community-maintained Linux packages for the **remote-only Hermes Light** variant from [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). This project builds the upstream desktop application in GitHub Actions and distributes it as portable **AppImages** and native **Ubuntu/Kubuntu `.deb` packages**, including a signed APT repository for normal system updates.
 
-## Supported targets
+**[Project website and APT instructions](https://dacog.github.io/hermes-desktop-light/)** · **[Download latest release](https://github.com/dacog/hermes-desktop-light/releases/latest)** · **[Build workflow](.github/workflows/release.yml)**
 
-| Ubuntu / Kubuntu base | APT suite | Architectures |
-| --- | --- | --- |
-| 24.04 LTS | noble | amd64, arm64 |
-| 26.04 LTS | resolute | amd64, arm64 |
+> **Independent packaging, not a fork of Hermes Desktop.** We do **not patch or modify the tracked Hermes application source code**. Each build checks out a published upstream release from GitHub and uses its existing Light variant. The workflow makes packaging-specific adjustments to the build environment, temporary third-party packaging tools, and Debian package metadata, but does not change the app's original source files. This repository is **not affiliated with or endorsed by Nous Research**.
 
-The [project homepage](https://dacog.github.io/hermes-desktop-light/) is generated alongside the signed APT repository, with versioned download links.
+## Why this project exists
 
-The scheduled workflow checks the latest **stable** upstream release twice daily and builds four Debian packages, plus two portable AppImages (amd64 and arm64, compiled on Ubuntu 24.04 for a broad Linux compatibility baseline). Debian packages are checked with `apt-get install` in CI before publication. The remote Hermes gateway runs on a separate device.
+I use several computers and laptops, while my Hermes Agent runs on a **separate, remote server**. I wanted to open the Hermes desktop interface on any of those devices and connect to the existing agent—not install and operate another full copy of Hermes on every machine.
 
-## One-time setup
+I first tried the [official Hermes installer](https://github.com/NousResearch/hermes-agent) on Kubuntu:
 
-1. In repository **Settings → Pages**, select **GitHub Actions** as the Pages build source.
-2. Clone this repo onto a trusted Linux computer with GnuPG installed, and run `bash scripts/generate-signing-key.sh`.
-3. **Back up the private key securely**. Set the GitHub Actions repository secret:
-   ```bash
-   gh secret set APT_GPG_PRIVATE_KEY < signing/apt-private-key.asc
-   ```
-4. In **Actions**, run **Build Hermes Desktop Light and publish APT**. Confirm all four Debian builds, the two AppImages, the GitHub Release and Pages deployment. If a GitHub Release already exists but APT is not yet published, run with **force=true** after enabling Pages. Otherwise the workflow skips that already-published version.
+```bash
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+```
 
-The signing key is **not** in GitHub; the pipeline cannot sign APT metadata until the secret is configured. GitHub Actions cannot automatically enable Pages with its default GITHUB_TOKEN. If you see a Pages warning, open [Settings → Pages](https://github.com/dacog/hermes-desktop-light/settings/pages) and select **Source: GitHub Actions**. Release assets are uploaded independently of Pages.
+In my case, the installation became stuck around the **`git clone`** step. More importantly, a full local installation was not what I wanted in the first place: the agent was already running remotely. Looking for a prebuilt Linux package of the upstream **remote-only Hermes Light** desktop variant, I did not find one that matched this use case at the time.
 
-## Portable AppImages (no installation)
+So I created this small distribution project: **build the upstream Light client once in CI, download it on multiple devices, and leave Hermes Agent running on the server**. No per-laptop cloning, Python environment, or local Hermes Agent installation should be required to use the packaged Light client.
 
-Download the amd64 or arm64 `.AppImage` from [GitHub Releases](https://github.com/dacog/hermes-desktop-light/releases). On a compatible Linux system:
+The project solves a distribution problem, **not** a problem that requires a modified desktop application. The earlier installer experience is a personal report, not a claim that the upstream installer fails for everyone.
+
+## What gets packaged—and what does not
+
+- **Included:** the upstream Electron desktop application built with `--variant light`, the remote-only variant designed to connect to an existing Hermes service.
+- **Not included:** a second local Hermes Agent installation, its Python runtime, or a local agent environment to manage.
+- **Not changed:** Hermes application source files, features, UI code, or upstream release contents.
+- **Adapted for Linux distribution:** CI build arguments and tools, package naming/version metadata, native Linux launch integration, and the signed APT repository.
+
+The resulting packages are based on a specific upstream Git tag and exact checkout commit. The workflow applies compatibility fixes **only while preparing and packaging** the application; these do not create or maintain an independent fork of Hermes itself.
+
+## Current compatibility and testing
+
+| Format | Platform | Architecture | Verification |
+| --- | --- | --- | --- |
+| AppImage | **Kubuntu 26.04** | AMD64 | **Successfully launched on a real machine** (October 2026, user-tested) |
+| AppImage | Other compatible Linux distributions | AMD64, ARM64 | Builds in CI; graphical operation not yet confirmed |
+| `.deb` | Ubuntu/Kubuntu 24.04 (noble) | AMD64, ARM64 | Builds and installs successfully in GitHub Actions |
+| `.deb` | Ubuntu/Kubuntu 26.04 (resolute) | AMD64, ARM64 | Builds and installs successfully in GitHub Actions; **manual desktop test pending** |
+
+**Important:** a successful AppImage launch is confirmed on Kubuntu 26.04, but an end-to-end connection to the remote Hermes server has **not yet been verified here**. Likewise, the `.deb` packages have passed installation smoke tests but are still awaiting an independent real-desktop test.
+
+The AppImages are compiled on Ubuntu 24.04 to provide a relatively conservative Linux baseline; this does not guarantee compatibility with every distribution or desktop environment.
+
+## Download and run
+
+### Option 1: AppImage (portable; no installation)
+
+Download the appropriate `.AppImage` for your CPU from [GitHub Releases](https://github.com/dacog/hermes-desktop-light/releases/latest).
 
 ```bash
 chmod +x hermes-desktop-light_*.AppImage
 ./hermes-desktop-light_*.AppImage
 ```
 
-AppImages do not use the APT auto-update channel. The older Ubuntu 24.04 build baseline generally improves portability, but compatibility still depends on your Linux environment (including FUSE support). Always test launching and connecting to your remote Hermes gateway.
+The AppImage has been opened successfully on **Kubuntu 26.04**. Depending on the distribution, AppImage execution can require FUSE-related compatibility packages. AppImages do **not** receive APT updates or necessarily create an application menu shortcut automatically.
 
-## Installation through APT
+### Option 2: Native `.deb` via APT (Ubuntu/Kubuntu)
 
-After the first successful Pages deployment:
+Install from the [signed APT repository](https://dacog.github.io/hermes-desktop-light/) for regular system updates:
 
 ```bash
 set -e
@@ -48,28 +69,68 @@ base='https://dacog.github.io/hermes-desktop-light'
 sudo install -d -m 0755 /etc/apt/keyrings
 curl -fsSL "$base/hermes-desktop-light.gpg" | sudo tee /etc/apt/keyrings/hermes-desktop-light.gpg >/dev/null
 sudo chmod 644 /etc/apt/keyrings/hermes-desktop-light.gpg
+
 codename="$(. /etc/os-release; printf '%s' "$VERSION_CODENAME")"
-case "$codename" in noble|resolute) ;; *) echo "Unsupported Ubuntu base: $codename" >&2; exit 1;; esac
+case "$codename" in
+  noble|resolute) ;;
+  *) echo "Unsupported Ubuntu base: $codename" >&2; exit 1 ;;
+esac
 arch="$(dpkg --print-architecture)"
-printf 'deb [arch=%s signed-by=/etc/apt/keyrings/hermes-desktop-light.gpg] %s %s main\n' "$arch" "$base" "$codename" | sudo tee /etc/apt/sources.list.d/hermes-desktop-light.list
+
+printf 'deb [arch=%s signed-by=/etc/apt/keyrings/hermes-desktop-light.gpg] %s %s main\n' \
+  "$arch" "$base" "$codename" | sudo tee /etc/apt/sources.list.d/hermes-desktop-light.list
+
 sudo apt update
 sudo apt install hermes-desktop-light
 ```
 
-Then use `sudo apt upgrade` for subsequent updates.
+Once installed, look for **Hermes Light** in the application menu. Updates are handled by your usual `sudo apt upgrade`. Alternatively, download the matching `.deb` from [Releases](https://github.com/dacog/hermes-desktop-light/releases/latest).
 
-## Workflow
+## How the builds work
 
-- **Check:** resolve latest stable upstream tag, or manual `upstream_tag`.
-- **Build:** check out the upstream release tag, verify its exact commit, prepare upstream Light dependencies plus `deb` packaging tools, and compile with the fixed stable Hermes Light identity using the GitHub Actions build environment. The upstream internal release-claim mechanism is not required for this community build.
-- **Package:** normalize the Debian package name to `hermes-desktop-light` and derive a Debian version from the upstream release tag (`0.21.6+ubuntu24.04`, for example), rather than the `0.0.0` source version used for commit builds.
-- **Test:** install each Debian package with `apt-get` on its matching runner; assert both portable AppImages are produced.
-- **Publish:** generate signed `noble` and `resolute` APT metadata, publish all four Debian packages plus two AppImages through GitHub Releases, and deploy APT to Pages if GitHub Pages is enabled. If Pages is not enabled, the Release remains available and the job reports an explicit warning.
+The [GitHub Actions workflow](.github/workflows/release.yml):
 
-The Linux packaging flow is maintained independently from the disabled upstream Linux release jobs; future upstream changes may require compatibility fixes. This is a community project, not an official upstream installer.
+1. Checks for the latest stable NousResearch Hermes release **twice daily**, or accepts a manually specified upstream tag.
+2. Checks out that exact upstream release and compiles the official **Light** desktop variant—no locally installed Hermes Agent is required.
+3. Builds **four `.deb` packages**: Ubuntu 24.04 and 26.04, each for AMD64 and ARM64.
+4. Builds **two portable AppImages** (AMD64 and ARM64), using Ubuntu 24.04 runners.
+5. Tests the installation of each `.deb` with APT inside its matching GitHub Actions runner.
+6. Publishes all six binaries and SHA-256 checksums to [GitHub Releases](https://github.com/dacog/hermes-desktop-light/releases), and deploys the signed APT repository and download homepage through GitHub Pages.
+
+Linux release builds are not currently part of the upstream project's regular release matrix. This repository fills that gap independently. The temporary packaging adaptations, stable application identity, and Debian package name are maintained **here**, without submitting modified Hermes app source as our own.
+
+### For maintainers: APT signing
+
+GitHub Pages must use **Settings → Pages → Source: GitHub Actions**. On a trusted local machine with GnuPG installed, generate and back up the signing key:
+
+```bash
+bash scripts/generate-signing-key.sh
+gh secret set APT_GPG_PRIVATE_KEY < signing/apt-private-key.asc
+```
+
+The private key belongs in a secure, separate backup—not in Git. The entire `signing/` directory is ignored by `.gitignore`. The secret is used only by GitHub Actions to sign APT metadata.
+
+Releases already published are skipped by default. To rebuild a particular upstream version or publish the APT site again, use **Actions → Run workflow** with the appropriate version and `force=true`.
+
+## Scope and possible future distributions
+
+**For now, this project deliberately focuses on Ubuntu/Kubuntu.** Before broadening distribution support, the goal is to finish desktop/gateway testing and verify that APT updates behave correctly on actual machines.
+
+Fedora (`.rpm`) and Arch Linux packages are possible future additions, but not currently supported. There are also related community efforts worth knowing about:
+
+- [jabla/hermes-agent-desktop-bin](https://github.com/jabla/hermes-agent-desktop-bin): an existing **Arch/AUR** desktop package, built using a different approach and patches; useful to review before duplicating Arch packaging work.
+- [fdfretes/hermes-desktop-linux-arm64](https://github.com/fdfretes/hermes-desktop-linux-arm64): a separate Linux ARM64 desktop distribution based on another Hermes Desktop wrapper, designed around a bundled local runtime, rather than this upstream remote-only Light packaging.
+
+These projects are related but **not interchangeable**. Their existence is a good reason to collaborate or reuse established distro packaging conventions rather than assume no other Linux work exists.
+
+## Credits and disclaimer
+
+**Initiated and maintained by Diego Carrasco; co-created through an iterative collaboration with [ChatGPT](https://chatgpt.com) (OpenAI).** ChatGPT assisted with the packaging design, GitHub Actions workflows, debugging, and documentation. Diego is responsible for the repository, releases, signing key, and testing decisions.
+
+**Hermes Agent and Hermes Desktop are created by [Nous Research](https://github.com/NousResearch/hermes-agent)**. All credit for the original application belongs to its upstream authors. This is an independent packaging and distribution project, with no affiliation or endorsement implied from Nous Research or OpenAI.
 
 ## Security and limitations
 
-The workflow does not include end-to-end GUI-to-gateway testing or vulnerability scanning. The upstream source is checked out by its release tag and verified by the exact commit SHA, but upstream tag cryptographic signatures are not verified. APT signatures authenticate the repository metadata under **your** signing key. Do not commit the contents of `signing/`.
+Builds consume the exact upstream release checkout and use an independently maintained GitHub Actions workflow. The project does not currently verify upstream cryptographic tag signatures, provide a third-party security audit, or test every desktop environment. APT repository metadata is signed with the maintainer's GPG key. Review releases and provenance before installing software from any third-party package repository.
 
-See [upstream Desktop build instructions](https://github.com/NousResearch/hermes-agent/blob/main/apps/desktop/BUILDING.md).
+See [upstream desktop build documentation](https://github.com/NousResearch/hermes-agent/blob/main/apps/desktop/BUILDING.md) for the official application build contract.
