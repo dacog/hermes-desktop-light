@@ -1,6 +1,11 @@
 name: Build Hermes Desktop Light and publish APT
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release.yml'
+      - 'scripts/**'
   schedule:
     - cron: '17 5,17 * * *'
   workflow_dispatch:
