@@ -66,7 +66,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 150
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: NousResearch/hermes-agent
           ref: ${{ needs.check.outputs.tag }}
@@ -119,19 +119,65 @@ jobs:
           prepared.digests[str(packager)] = fingerprint(packager)
           prepared.write(prepared_path)
           PY
-          python3 scripts/bundles/desktop.py --prepared .build/desktop-job/prepared.json -- deb
+          # Upstream commit packaging normally suffixes the app identity with its
+          # SHA. A stable APT package must keep the same appId and userData across
+          # releases. Override ONLY the build-time brand environment, while the
+          # preparation receipt continues to verify the exact upstream commit.
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+          from scripts.bundles import desktop, desktop_inputs
+          from scripts.bundles.desktop_prepare import PreparedDesktop
+
+          tag = os.environ["UPSTREAM_TAG"]
+          version = tag.removeprefix("v")
+          if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+              raise ValueError(f"Only stable upstream releases are supported: {tag}")
+
+          prep = Path(".build/desktop-job/prepared.json").resolve()
+          original_build_environment = desktop_inputs.build_environment
+
+          def stable_light_environment(*args, **kwargs):
+              env = original_build_environment(*args, **kwargs)
+              env.pop("HERMES_BUILD_COMMIT", None)
+              env["HERMES_PAYLOAD_TAG"] = tag
+              env["HERMES_PAYLOAD_VERSION"] = version
+              env["GITHUB_REF_NAME"] = tag
+              return env
+
+          desktop_inputs.build_environment = stable_light_environment
+          prepared = PreparedDesktop.load(prep)
+          env = stable_light_environment(prepared, "light", os.environ)
+          subprocess.run(
+              [str(prepared.node), "-e",
+               "const x=require('./apps/desktop/product-identity.cjs'); "
+               "if(x.appId!=='com.nousresearch.hermes-light' || !x.light) "
+               "process.exit(2); console.log(x.displayName,x.appId)"],
+              env=env, cwd=Path.cwd(), check=True,
+          )
+
+          # desktop.py includes AppImage in its Linux defaults. The second
+          # --linux supplies the Debian target as an option, not a bare arg.
+          desktop.build_prepared(prep, [
+              "--linux", "deb", f"-c.extraMetadata.version={version}"
+          ])
+          PY
       - name: Normalize Debian metadata
         shell: bash
         env:
           ARCH: ${{ matrix.arch }}
           UBUNTU_VERSION: ${{ matrix.ubuntu_version }}
+          UPSTREAM_TAG: ${{ needs.check.outputs.tag }}
         run: |
           set -euo pipefail
           shopt -s nullglob
           debs=(hermes-agent/apps/desktop/release/*.deb)
           (( ${#debs[@]} == 1 )) || { echo "Expected one .deb; got ${#debs[@]}" >&2; exit 1; }
           [[ "$(dpkg-deb -f "${debs[0]}" Architecture)" == "$ARCH" ]]
-          version="$(dpkg-deb -f "${debs[0]}" Version)+ubuntu${UBUNTU_VERSION}"
+          version="${UPSTREAM_TAG#v}+ubuntu${UBUNTU_VERSION}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+\+ubuntu(24\.04|26\.04)$ ]] || exit 1
           mkdir -p unpacked dist
           dpkg-deb --raw-extract "${debs[0]}" unpacked
           sed -i -E -e 's/^Package: .*/Package: hermes-desktop-light/' -e "s/^Version: .*/Version: ${version}/" unpacked/DEBIAN/control
@@ -141,7 +187,7 @@ jobs:
         run: |
           sudo apt-get install -y ./dist/*.deb
           dpkg-query -W hermes-desktop-light
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: deb-${{ matrix.suite }}-${{ matrix.arch }}
           path: dist/*.deb
@@ -159,8 +205,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           pattern: deb-*
           merge-multiple: true
