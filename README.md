@@ -37,12 +37,12 @@ The resulting packages are based on a specific upstream Git tag and exact checko
 
 | Format | Platform | Architecture | Verification |
 | --- | --- | --- | --- |
-| AppImage | **Kubuntu 26.04** | AMD64 | **Launched successfully and connected to a remote Hermes backend** (October 2026, user-tested) |
+| AppImage | **Kubuntu 26.04** | AMD64 | **Runs on a separate laptop**; a successful connection to a remote Hermes backend has also been confirmed on Kubuntu 26.04 (October 2026, user-tested) |
 | AppImage | Other compatible Linux distributions | AMD64, ARM64 | Builds in CI; graphical operation not yet confirmed |
 | `.deb` | Ubuntu/Kubuntu 24.04 (noble) | AMD64, ARM64 | Builds and installs successfully in GitHub Actions |
-| `.deb` | Ubuntu/Kubuntu 26.04 (resolute) | AMD64, ARM64 | Builds and installs successfully in GitHub Actions; **manual desktop test pending** |
+| `.deb` | **Kubuntu 26.04 (resolute)** | AMD64 | **Installed successfully using the published APT instructions and running on a real desktop** (October 2026, user-tested) |
 
-**Verified on a real device:** on Kubuntu 26.04 AMD64, the AppImage **opens and successfully connects to an existing remote Hermes backend**. The `.deb` packages have passed installation smoke tests in CI, but are **still awaiting manual GUI testing**.
+**Verified on real devices (October 2026):** the native `.deb` **installs cleanly through the instructions on the [project website](https://dacog.github.io/hermes-desktop-light/) and runs on Kubuntu 26.04**. The portable AppImage **also runs on a separate Kubuntu 26.04 laptop**. An AppImage connection to an existing remote Hermes backend was previously tested successfully on Kubuntu 26.04. A remote-gateway connection specifically from the `.deb` installation has not yet been independently confirmed. Ubuntu 24.04 and ARM64 remain CI-tested only.
 
 The AppImages are compiled on Ubuntu 24.04 to provide a relatively conservative Linux baseline; this does not guarantee compatibility with every distribution or desktop environment.
 
@@ -57,7 +57,7 @@ chmod +x hermes-desktop-light_*.AppImage
 ./hermes-desktop-light_*.AppImage
 ```
 
-The AppImage has been opened and **connected successfully to a remote Hermes backend on Kubuntu 26.04 (AMD64)**. Depending on the distribution, AppImage execution can require FUSE-related compatibility packages. AppImages do **not** receive APT updates or necessarily create an application menu shortcut automatically.
+The AppImage has been **launched successfully on a separate laptop running Kubuntu 26.04**; connecting an AppImage to a remote Hermes backend has also been verified on Kubuntu 26.04 (AMD64). Depending on the distribution, AppImage execution can require FUSE-related compatibility packages. AppImages do **not** receive APT updates or necessarily create an application menu shortcut automatically.
 
 ### Option 2: Native `.deb` via APT (Ubuntu/Kubuntu)
 
@@ -84,7 +84,7 @@ sudo apt update
 sudo apt install hermes-desktop-light
 ```
 
-Once installed, look for **Hermes Light** in the application menu. Updates are handled by your usual `sudo apt upgrade`. Alternatively, download the matching `.deb` from [Releases](https://github.com/dacog/hermes-desktop-light/releases/latest).
+**Real-device confirmation (October 2026):** the published APT instructions successfully installed the `.deb`, and Hermes Light runs on Kubuntu 26.04. Once installed, look for **Hermes Light** in the application menu. Updates are handled by your usual `sudo apt upgrade`. Alternatively, download the matching `.deb` from [Releases](https://github.com/dacog/hermes-desktop-light/releases/latest).
 
 ## Automatic upstream release tracking and updates
 
